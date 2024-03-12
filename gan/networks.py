@@ -27,7 +27,11 @@ class UpSampleConv2D(torch.jit.ScriptModule):
         # (batch, channel, height*upscale_factor, width*upscale_factor)
         # 3. Apply convolution and return output
         ##################################################################
-        pass
+        x_channel_repeat = torch.repeat_interleave(x, self.upscale_factor, dim = 1)
+        pixel_shuffle = nn.PixelShuffle(self.upscale_factor)
+        x_shuffle = pixel_shuffle(x_channel_repeat)
+        x_out = self.conv(x_shuffle)
+        return x_out
         ##################################################################
         #                          END OF YOUR CODE                      #
         ##################################################################
@@ -54,7 +58,15 @@ class DownSampleConv2D(torch.jit.ScriptModule):
         # 3. Take the average across dimension 0, apply convolution,
         # and return the output
         ##################################################################
-        pass
+        batch, chann_downscale , height, width = x.shape()
+        pixel_unshuffle = nn.PixelUnshuffle(self.downscale_ratio)
+        x_unshuffled = pixel_unshuffle(x)
+        x_reshaped = x_unshuffled.view(self.downscale_ratio**2, batch, -1, height, width)
+        x_mean = torch.mean(x_reshaped, dim = 0)
+        x_out = self.conv(x_mean)
+
+        return x_out
+
         ##################################################################
         #                          END OF YOUR CODE                      #
         ##################################################################
@@ -83,7 +95,17 @@ class ResBlockUp(torch.jit.ScriptModule):
         ##################################################################
         # TODO 1.1: Setup the network layers
         ##################################################################
-        self.layers = None
+        self.layers = nn.Sequential(
+            nn.BatchNorm2d(input_channels, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+            nn.ReLU(),
+            nn.Conv2d(input_channels, n_filters, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False),
+            nn.BatchNorm2d(n_filters, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+            nn.ReLU(),
+            UpSampleConv2D(
+            n_filters, kernel_size=(3, 3), n_filters=n_filters, padding=(1, 1))
+        )
+        self.upsample = UpSampleConv2D(
+            input_channels, kernel_size=1, n_filters=n_filters, padding=0)
         ##################################################################
         #                          END OF YOUR CODE                      #
         ##################################################################
@@ -95,7 +117,9 @@ class ResBlockUp(torch.jit.ScriptModule):
         # connection. Make sure to upsample the residual before adding it
         # to the layer output.
         ##################################################################
-        pass
+        x_out = self.layers(x)
+        return x_out + self.upsample(x)
+
         ##################################################################
         #                          END OF YOUR CODE                      #
         ##################################################################
@@ -122,7 +146,13 @@ class ResBlockDown(torch.jit.ScriptModule):
         ##################################################################
         # TODO 1.1: Setup the network layers
         ##################################################################
-        self.layers = None
+        self.layers = nn.Sequential(
+            nn.ReLU(),
+            nn.Conv2D(input_channels, n_filters, kernel_size=(kernel_size, kernel_size), stride=(1, 1), padding=(1, 1)),
+            nn.ReLU(),
+            DownSampleConv2D(n_filters, kernel_size=(kernel_size, kernel_size), n_filters=n_filters, padding = (1,1))
+        )
+        self.downsample = DownSampleConv2D(input_channels, kernel_size=1, n_filters=n_filters, padding = 0)
         ##################################################################
         #                          END OF YOUR CODE                      #
         ##################################################################
@@ -134,7 +164,8 @@ class ResBlockDown(torch.jit.ScriptModule):
         # connection. Make sure to downsample the residual before adding
         # it to the layer output.
         ##################################################################
-        pass
+        x_out = self.layers(x)
+        return x_out + self.downsample(x)
         ##################################################################
         #                          END OF YOUR CODE                      #
         ##################################################################
@@ -157,7 +188,12 @@ class ResBlock(torch.jit.ScriptModule):
         ##################################################################
         # TODO 1.1: Setup the network layers
         ##################################################################
-        self.layers = None
+        self.layers = nn.Sequential(
+            nn.ReLU(),
+            nn.Conv2d(input_channels, n_filters, kernel_size = (kernel_size, kernel_size), stride=(1, 1), padding=(1, 1)),
+            nn.ReLU(),
+            nn.Conv2d(n_filters, n_filters, kernel_size = (kernel_size, kernel_size), stride=(1, 1), padding=(1, 1))
+        )
         ##################################################################
         #                          END OF YOUR CODE                      #
         ##################################################################
@@ -168,7 +204,8 @@ class ResBlock(torch.jit.ScriptModule):
         # TODO 1.1: Forward the conv layers. Don't forget the residual
         # connection!
         ##################################################################
-        pass
+        x_out = self.layers(x)
+        return x_out + x
         ##################################################################
         #                          END OF YOUR CODE                      #
         ##################################################################
