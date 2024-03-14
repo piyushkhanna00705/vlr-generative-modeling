@@ -28,8 +28,10 @@ def get_optimizers_and_schedulers(gen, disc):
     # The learning rate for the generator should be decayed to 0 over
     # 100K iterations.
     ##################################################################
-    scheduler_discriminator = None
-    scheduler_generator = None
+    lambda_discr = lambda epoch: max(1 - epoch/500000, 0)
+    lambda_gen = lambda epoch: max(1 - epoch/100000, 0)
+    scheduler_discriminator = torch.optim.LambdaLR(optim_discriminator, lr_lambda = lambda_discr)
+    scheduler_generator = torch.optim.LambdaLR(optim_generator, lr_lambda = lambda_gen)
     ##################################################################
     #                          END OF YOUR CODE                      #
     ##################################################################
@@ -105,8 +107,8 @@ def train_model(
                 # 2. Compute discriminator output on the train batch.
                 # 3. Compute the discriminator output on the generated data.
                 ##################################################################
-                discrim_real = None
-                discrim_fake = None
+                discrim_real = disc(train_batch)
+                discrim_fake = disc(gen(train_batch.shape[0]))
                 ##################################################################
                 #                          END OF YOUR CODE                      #
                 ##################################################################

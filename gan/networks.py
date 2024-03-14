@@ -274,8 +274,17 @@ class Generator(torch.jit.ScriptModule):
         # TODO 1.1: Set up the network layers. You should use the modules
         # you have implemented previously above.
         ##################################################################
-        self.dense = None
-        self.layers = None
+        self.dense = nn.Linear(in_features=128, out_features=2048, bias=True)
+        self.layers = nn.Sequential(
+            ResBlockUp(128),
+            ResBlockUp(128),
+            ResBlockUp(128),
+            nn.BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
+            nn.ReLU()
+            nn.Conv2d(128, 3, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+            nn.Tanh()
+
+        )
         ##################################################################
         #                          END OF YOUR CODE                      #
         ##################################################################
@@ -287,7 +296,10 @@ class Generator(torch.jit.ScriptModule):
         # been passed in. Don't forget to re-shape the output of the dense
         # layer into an image with the appropriate size!
         ##################################################################
-        pass
+        z_1 = self.dense(z)
+        img_inp = z_1.view(-1, 128, 4, 4)
+        retur self.layers(img_inp)
+
         ##################################################################
         #                          END OF YOUR CODE                      #
         ##################################################################
@@ -298,7 +310,8 @@ class Generator(torch.jit.ScriptModule):
         # TODO 1.1: Generate n_samples latents and forward through the
         # network.
         ##################################################################
-        pass
+        noise_sample = torch.normal(0., 1., size = (n_samples, 128)).to(torch.device('cuda'))
+        return self.forward_given_samples(noise_sample)
         ##################################################################
         #                          END OF YOUR CODE                      #
         ##################################################################
@@ -362,8 +375,14 @@ class Discriminator(torch.jit.ScriptModule):
         # TODO 1.1: Set up the network layers. You should use the modules
         # you have implemented previously above.
         ##################################################################
-        self.dense = None
-        self.layers = None
+        self.dense = nn.Linear(in_features=128, out_features=1, bias=True)
+        self.layers = nn.Sequential(
+            ResBlockDown(3),
+            ResBlockDown(128),
+            ResBlock(128),
+            ResBlock(128),
+            nn.ReLU()
+        )
         ##################################################################
         #                          END OF YOUR CODE                      #
         ##################################################################
@@ -375,7 +394,9 @@ class Discriminator(torch.jit.ScriptModule):
         # have been passed in. Make sure to sum across the image
         # dimensions after passing x through self.layers.
         ##################################################################
-        pass
+        x_1 = self.layers(x)
+        x_sum = torch.sum(x_1, dim = (2,3)).view(-1, 128)
+        return self.dense(x_sum)
         ##################################################################
         #                          END OF YOUR CODE                      #
         ##################################################################
