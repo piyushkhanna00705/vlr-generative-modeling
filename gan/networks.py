@@ -17,6 +17,7 @@ class UpSampleConv2D(torch.jit.ScriptModule):
             input_channels, n_filters, kernel_size=kernel_size, padding=padding
         )
         self.upscale_factor = upscale_factor
+        self.pixel_shuffle = torch.nn.PixelShuffle(self.upscale_factor)
 
     @torch.jit.script_method
     def forward(self, x):
@@ -28,8 +29,8 @@ class UpSampleConv2D(torch.jit.ScriptModule):
         # 3. Apply convolution and return output
         ##################################################################
         x_channel_repeat = torch.repeat_interleave(x, self.upscale_factor, dim = 1)
-        pixel_shuffle = nn.PixelShuffle(self.upscale_factor)
-        x_shuffle = pixel_shuffle(x_channel_repeat)
+        # pixel_shuffle = torch.nn.PixelShuffle(self.upscale_factor)
+        x_shuffle = self.pixel_shuffle(x_channel_repeat)
         x_out = self.conv(x_shuffle)
         return x_out
         ##################################################################
@@ -46,6 +47,7 @@ class DownSampleConv2D(torch.jit.ScriptModule):
             input_channels, n_filters, kernel_size=kernel_size, padding=padding
         )
         self.downscale_ratio = downscale_ratio
+        self.pixel_unshuffle = torch.nn.PixelUnshuffle(self.downscale_ratio)
 
     @torch.jit.script_method
     def forward(self, x):
@@ -59,8 +61,8 @@ class DownSampleConv2D(torch.jit.ScriptModule):
         # and return the output
         ##################################################################
         batch, chann_downscale , height, width = x.shape()
-        pixel_unshuffle = nn.PixelUnshuffle(self.downscale_ratio)
-        x_unshuffled = pixel_unshuffle(x)
+        # pixel_unshuffle = torch.nn.PixelUnshuffle(self.downscale_ratio)
+        x_unshuffled = self.pixel_unshuffle(x)
         x_reshaped = x_unshuffled.view(self.downscale_ratio**2, batch, -1, height, width)
         x_mean = torch.mean(x_reshaped, dim = 0)
         x_out = self.conv(x_mean)
@@ -280,7 +282,7 @@ class Generator(torch.jit.ScriptModule):
             ResBlockUp(128),
             ResBlockUp(128),
             nn.BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True),
-            nn.ReLU()
+            nn.ReLU(),
             nn.Conv2d(128, 3, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
             nn.Tanh()
 
@@ -298,7 +300,7 @@ class Generator(torch.jit.ScriptModule):
         ##################################################################
         z_1 = self.dense(z)
         img_inp = z_1.view(-1, 128, 4, 4)
-        retur self.layers(img_inp)
+        return self.layers(img_inp)
 
         ##################################################################
         #                          END OF YOUR CODE                      #

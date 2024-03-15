@@ -138,8 +138,8 @@ def train_model(
                     # TODO 1.2: Compute generator and discriminator output on
                     # generated data.
                     ###################################################################
-                    fake_batch = None
-                    discrim_fake = None
+                    fake_batch = gen(train_batch.shape[0])
+                    discrim_fake = disc(fake_batch)
                     ##################################################################
                     #                          END OF YOUR CODE                      #
                     ##################################################################
@@ -158,7 +158,8 @@ def train_model(
                         # TODO 1.2: Generate samples using the generator.
                         # Make sure they lie in the range [0, 1]!
                         ##################################################################
-                        generated_samples = None
+                        # they lie in the range [0, 1]?? what does this mean? Check/modify
+                        generated_samples = gen(train_batch.shape[0])
                         ##################################################################
                         #                          END OF YOUR CODE                      #
                         ##################################################################
